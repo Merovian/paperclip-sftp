@@ -5,7 +5,7 @@ module Paperclip
     module Sftp
 
       # SFTP storage expects a hash with following options:
-      # :host, :user, :password.
+      # :host, :user, :options.
       #
       def self.extended(base)
         begin
@@ -23,10 +23,15 @@ module Paperclip
       # Make SFTP connection, but use current one if exists.
       #
       def sftp
-        @sftp ||= Net::SFTP.start(
-          @sftp_options[:host],
-          @sftp_options[:user],
-          password: @sftp_options[:password]
+        @sftp ||= obtain_net_sftp_instance_for(@sftp_options)
+      end
+
+      def obtain_net_sftp_instance_for(options)
+        instances = (Thread.current[:paperclip_sftp_instances] ||= {})
+        instances[options] ||= Net::SFTP.start(
+          options[:host],
+          options[:user],
+          options[:options]
         )
       end
 
