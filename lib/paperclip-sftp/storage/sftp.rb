@@ -5,7 +5,7 @@ module Paperclip
     module Sftp
 
       # SFTP storage expects a hash with following options:
-      # :host, :user, :options.
+      # :host, :user, :fs_root, :options.
       #
       def self.extended(base)
         begin
@@ -17,6 +17,8 @@ module Paperclip
 
         base.instance_exec do
           @sftp_options = options[:sftp_options] || {}
+          @sftp_options[:fs_root] = '/' unless @sftp_options[:fs_root]
+          @sftp_options[:options] = {} if @sftp_options[:options].nil?
         end
       end
 
@@ -37,7 +39,7 @@ module Paperclip
 
       def exists?(style = default_style)
         if original_filename
-          files = sftp.dir.entries(File.dirname(path(style))).map(&:name)
+          files = sftp.dir.entries(File.dirname(@sftp_options[:fs_root]+path(style))).map(&:name)
           files.include?(File.basename(path(style)))
         else
           false
@@ -48,7 +50,7 @@ module Paperclip
 
       def copy_to_local_file(style, local_dest_path)
         log("copying #{path(style)} to local file #{local_dest_path}")
-        sftp.download!(path(style), local_dest_path)
+        sftp.download!(@sftp_options[:fs_root]+path(style), local_dest_path)
       rescue Net::SFTP::StatusException => e
         warn("#{e} - cannot copy #{path(style)} to local file #{local_dest_path}")
         false
@@ -58,8 +60,8 @@ module Paperclip
         @queued_for_write.each do |style, file|
           mkdir_p(File.dirname(path(style)))
           log("uploading #{file.path} to #{path(style)}")
-          sftp.upload!(file.path, path(style))
-          sftp.setstat!(path(style), :permissions => 0644)
+          sftp.upload!(file.path, @sftp_options[:fs_root]+path(style))
+          sftp.setstat!(@sftp_options[:fs_root]+path(style), :permissions => 0644)
         end
 
         after_flush_writes # allows attachment to clean up temp files
@@ -70,13 +72,13 @@ module Paperclip
         @queued_for_delete.each do |path|
           begin
             log("deleting file #{path}")
-            sftp.remove(path).wait
+            sftp.remove(@sftp_options[:fs_root]+path).wait
           rescue Net::SFTP::StatusException => e
             # ignore file-not-found, let everything else pass
           end
 
           begin
-            path = File.dirname(path)
+            path = File.dirname(@sftp_options[:fs_root]+path)
             while sftp.dir.entries(path).delete_if { |e| e.name =~ /^\./ }.empty?
               sftp.rmdir(path).wait
               path = File.dirname(path)
@@ -95,7 +97,7 @@ module Paperclip
       #
       def mkdir_p(remote_directory)
         log("mkdir_p for #{remote_directory}")
-        root_directory = '/'
+        root_directory = @sftp_options[:fs_root]
         remote_directory.split('/').each do |directory|
           next if directory.blank?
           unless sftp.dir.entries(root_directory).map(&:name).include?(directory)
