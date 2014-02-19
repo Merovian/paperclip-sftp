@@ -97,7 +97,7 @@ module Paperclip
       #
       def mkdir_p(remote_directory)
         log("mkdir_p for #{remote_directory}")
-        root_directory = @sftp_options[:fs_root]
+        root_directory = @sftp_options[:fs_root] + '/'
         remote_directory.split('/').each do |directory|
           next if directory.blank?
           unless sftp.dir.entries(root_directory).map(&:name).include?(directory)
