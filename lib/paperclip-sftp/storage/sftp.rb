@@ -19,6 +19,31 @@ module Paperclip
           @sftp_options = options[:sftp_options] || {}
           @sftp_options[:fs_root] = '/' unless @sftp_options[:fs_root]
           @sftp_options[:options] = {} if @sftp_options[:options].nil?
+
+          unless @options[:url].to_s.match(/^:sftp.*url$/)
+            @options[:path] = @options[:path].gsub(/:url/, @options[:url])
+            @options[:url] = ':sftp_public_url'
+          end
+
+          Paperclip.interpolates(:sftp_public_url) do |attachment, style|
+            attachment.public_url(style)
+          end unless Paperclip::Interpolations.respond_to? :sftp_public_url
+        end
+      end
+
+      def public_url(style=default_style)
+        if @options[:sftp_host]
+          "#{dynamic_sftp_host_for_style(style)}/#{remote_directory(path(style))}"
+        else
+          "/#{path(style)}"
+        end
+      end
+
+      def dynamic_sftp_host_for_style(style)
+        if @options[:sftp_host].respond_to?(:call)
+          @options[:sftp_host].call(self)
+        else
+          "/#{path(style)}"
         end
       end
 
