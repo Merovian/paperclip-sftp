@@ -40,7 +40,7 @@ module Paperclip
       end
 
       def dynamic_sftp_host_for_style(style)
-        @sftp_options[:host] + '/~' + @sftp_options[:user] + '/' + @sftp_options[:fs_root].gsub(/^.*public_html./, '')
+        'http://' + @sftp_options[:host] + '/~' + @sftp_options[:user] + '/' + @sftp_options[:fs_root].gsub(/^.*public_html./, '')
       end
 
       # Make SFTP connection, but use current one if exists.
